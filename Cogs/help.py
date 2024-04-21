@@ -1,65 +1,111 @@
 import discord
 from discord.ext import commands
-from random import randint
+import time
+import json
+from functions import get_sprefix, is_owner
 
-class HelpCog(commands.Cog, name="help command"):
-	def __init__(self, bot:commands.Bot):
-		self.bot = bot
-  
 
-	@commands.command(name = 'help',
-					usage="(commandName)",
-					description = "Display the help message.",
-					aliases = ['h', '?'])
-	@commands.cooldown(1, 2, commands.BucketType.member)
-	async def help (self, ctx, commandName:str=None):
+with open('config.json', 'r', encoding="utf8") as f:
+    data = json.load(f)
+    color = int(data['color'], 16)
+    link = data['link']
 
-		commandName2 = None
-		stop = False
 
-		if commandName is not None:
-			for i in self.bot.commands:
-				if i.name == commandName.lower():
-					commandName2 = i
-					break 
-				else:
-					for j in i.aliases:
-						if j == commandName.lower():
-							commandName2 = i
-							stop = True
-							break
-						if stop is True:
-							break 
+class Help(commands.Cog, name="help command"):
+    def __init__(self, client):
+        self.client = client
 
-			if commandName2 is None:
-				await ctx.channel.send("No command found!")   
-			else:
-				embed = discord.Embed(title=f"{commandName2.name.upper()} Command", description="", color=randint(0, 0xffffff))
-				embed.set_thumbnail(url=f'{self.bot.user.avatar_url}')
-				embed.add_field(name=f"Name", value=f"{commandName2.name}", inline=False)
-				aliases = commandName2.aliases
-				aliasList = ""
-				if len(aliases) > 0:
-					for alias in aliases:
-						aliasList += alias + ", "
-					aliasList = aliasList[:-2]
-					embed.add_field(name=f"Aliases", value=aliasList)
-				else:
-					embed.add_field(name=f"Aliases", value="None", inline=False)
+    def cog_load(self):
+        print(f"cog.{self.__class__.__name__} был успешно загружен!")
 
-				if commandName2.usage is None:
-					embed.add_field(name=f"Usage", value=f"None", inline=False)
-				else:
-					embed.add_field(name=f"Usage", value=f"{self.bot.command_prefix}{commandName2.name} {commandName2.usage}", inline=False)
-				embed.add_field(name=f"Description", value=f"{commandName2.description}", inline=False)
-				await ctx.channel.send(embed=embed)             
-		else:
-			embed = discord.Embed(title=f"Help page", description=f"{self.bot.command_prefix}help (commandName), display the help list or the help data for a specific command.", color=randint(0, 0xffffff))
-			embed.set_thumbnail(url=f'{self.bot.user.avatar_url}')
-			for i in self.bot.commands:
-				embed.add_field(name=i.name, value=i.description, inline=False)
-			await ctx.channel.send(embed=embed)
+    @commands.command(name="help",
+                      usage="{команда}",
+                      description="Отображает доступные команды.")
+    @commands.cooldown(1, 2, commands.BucketType.member)
+    async def help(self, ctx, command=None):
+        if command is None:
+            emb = discord.Embed(
+                title="Доступные команды",
+                description=f"Используйте `{await get_sprefix(ctx.guild)}help [команда]`, чтобы узнать как использовать команду.",
+                color=color
+            )
 
-def setup(bot:commands.Bot):
-	bot.remove_command("help")
-	bot.add_cog(HelpCog(bot))
+            for i in self.client.commands:
+                if not i.hidden:
+                    emb.add_field(
+                        name=i.name,
+                        value=i.description,
+                        inline=True
+                    )
+
+            emb.add_field(
+                name=f'Ссылки',
+                value=link,
+                inline=False
+            )
+            await ctx.reply(embed=emb, mention_author=False)
+        else:
+            name = None
+
+            for i in self.client.commands:
+                if i.name == command.lower():
+                    name = i
+                    break
+                else:
+                    for j in i.aliases:
+                        if j == command.lower():
+                            name = i
+                            break
+
+            if name is None:
+                raise commands.CommandNotFound
+            else:
+                emb = discord.Embed(
+                    title=f"Команда {name.name}",
+                    description="",
+                    color=color
+                )
+                emb.add_field(
+                    name=f"Название",
+                    value=f"{name.name}",
+                    inline=False
+                )
+                aliasList = ', '.join(name.aliases)
+                if aliasList:
+                    emb.add_field(name=f"Другие имена", value=aliasList)
+                else:
+                    emb.add_field(
+                        name=f"Другие имена",
+                        value="Нет",
+                        inline=False
+                    )
+
+                if name.usage is None:
+                    emb.add_field(
+                        name=f"Использование",
+                        value=f"Нет",
+                        inline=False
+                    )
+                else:
+                    emb.add_field(
+                        name=f"Использование",
+                        value=f"{await get_sprefix(ctx.guild)}{name.name}\
+                             {name.usage}",
+                        inline=False
+                    )
+                emb.add_field(
+                    name=f"Описание",
+                    value=f"{name.description}",
+                    inline=False
+                )
+                emb.add_field(
+                    name=f'Ссылки',
+                    value=f'[Саппорт сервер \
+                        {self.client.user.name}](https://google.com/)',
+                    inline=False
+                )
+                await ctx.reply(embed=emb, mention_author=False)
+
+
+async def setup(client):
+    await client.add_cog(Help(client))
