@@ -36,7 +36,7 @@ client.remove_command('help')
 @client.event
 async def on_ready():
     await load_cogs()
-    print('ready, steady, go!')
+    print('Бот запустился!')
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=status))
 
 
